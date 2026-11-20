@@ -1,0 +1,9 @@
+name = "hilvana"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+# Los secretos NO van aquí. En local usa .dev.vars; en producción, panel de Cloudflare
+# (Workers & Pages → hilvana → Settings → Variables and secrets).
+# Variables de entorno: NO las pongas aquí. En Cloudflare Pages, si existe este archivo, es la fuente de verdad
+# y un APP_URL de localhost pisaría el del panel. Local: .dev.vars. Producción: Settings → Variables and secrets.

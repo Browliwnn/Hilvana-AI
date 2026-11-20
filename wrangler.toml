@@ -1,9 +1,13 @@
-name = "hilvana"
+name = "hilvana" # debe coincidir con el nombre del proyecto en Cloudflare
+main = "worker/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = "dist"
+keep_vars = true # el despliegue NO borra las variables que pongas en el panel de Cloudflare
 
-# Los secretos NO van aquí. En local usa .dev.vars; en producción, panel de Cloudflare
-# (Workers & Pages → hilvana → Settings → Variables and secrets).
-# Variables de entorno: NO las pongas aquí. En Cloudflare Pages, si existe este archivo, es la fuente de verdad
-# y un APP_URL de localhost pisaría el del panel. Local: .dev.vars. Producción: Settings → Variables and secrets.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# Secretos y variables: NO van aquí. Local: .dev.vars. Producción: Cloudflare → tu Worker → Settings → Variables and secrets.

@@ -56,7 +56,7 @@ stripe listen --forward-to localhost:8788/api/billing/webhook
 
 ## 5. Arrancar y probar
 ```bash
-npm run dev      # http://localhost:8788
+npm run dev      # web en http://localhost:5173 (la API corre en :8788 y se enlaza sola)
 ```
 Checklist: registro → confirmar correo → chat → foto → audio → imagen → pago con `4242 4242 4242 4242` → ver plan Plus en Mi cuenta → cancelar en el portal → exportar datos → borrar cuenta.
 
@@ -66,23 +66,28 @@ git init && git add . && git commit -m "Hilvana AI"
 gh repo create hilvana --private --source=. --push
 ```
 
-## 7. Cloudflare Pages
-1. Workers & Pages → Create → Pages → Connect to Git → elige el repo.
-2. Build command `npm run build`, output `dist`.
-3. **Variables de build:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SITE_URL=https://TUDOMINIO.com`, `VITE_OAUTH_PROVIDERS` (vacío o `google,apple`).
-4. **Secrets:** `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, los 4 `STRIPE_PRICE_*`.
-5. **Variables:** `APP_URL=https://TUDOMINIO.com`, `OPENAI_MODEL_FREE`, `OPENAI_MODEL_PAID`, `OPENAI_MODEL_DEEP`, `OPENAI_MODEL_FALLBACK`, `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_MODEL_FALLBACK`, `OPENAI_TRANSCRIBE_MODEL`, `OPENAI_TRANSCRIBE_MODEL_FALLBACK`, `STRIPE_AUTOMATIC_TAX`.
-6. Deploy y abre `https://TU-PROYECTO.pages.dev/api/health`: todo debe salir `true`.
+## 7. Cloudflare (Worker con web estática)
+El proyecto se despliega como **un Worker con assets** (la API en `/api/*` y la web desde `dist`). Es lo que hace `npx wrangler deploy`.
+1. Workers & Pages → Create → **Import a repository** → elige el repo.
+2. Pon el **nombre del proyecto igual al `name` de `wrangler.toml`** (por defecto `hilvana`; si usas otro, cámbialo en `wrangler.toml`).
+3. Build command `npm run build` · Deploy command `npx wrangler deploy` (déjalo como viene).
+4. **Variables de BUILD** (Settings → Build → Variables and secrets) — imprescindibles, sin ellas la web sale sin login:
+   `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SITE_URL=https://TUDOMINIO.com`, `VITE_OAUTH_PROVIDERS` (vacío o `google,apple`).
+   > Señal de que faltan: en el log del build aparece `supabase-xxxx.js 0.00 kB`. Debe pesar ~200 kB.
+5. **Variables y secretos del Worker** (Settings → Variables and secrets, *no* las de build):
+   - Secretos: `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_PLUS_YEARLY`, `STRIPE_PRICE_PRO_YEARLY`.
+   - Variables: `APP_URL=https://TUDOMINIO.com` y, si quieres cambiar de modelo, las `OPENAI_MODEL_*` (opcionales: ya traen el mejor modelo por defecto).
+   - `wrangler.toml` lleva `keep_vars = true`, así que los despliegues no las borran.
+6. Despliega y abre `https://TU-WORKER.TU-SUBDOMINIO.workers.dev/api/health`: todo debe salir `true`.
 
-> `npm run build` ejecuta los tests; si fallan, Cloudflare no publica. Es intencionado.
-
-> **Plan de Cloudflare:** para producción usa **Workers Paid (5 $/mes)**. El plan gratuito limita la CPU a 10 ms por petición y puede cortar respuestas largas o la creación de imágenes. Las variables se ponen en el panel (no en `wrangler.toml`, que a propósito no las contiene).
+> `npm run build` ejecuta los tests; si fallan, no se publica. Es intencionado.
+> Usa el plan **Workers Paid (5 $/mes)** en producción: el gratuito limita la CPU a 10 ms por petición y puede cortar respuestas largas o la creación de imágenes.
 
 ## 8. Dominio
-1. Cloudflare → Registrar (o tu registrador) → compra el dominio.
-2. Pages → Custom domains → añádelo.
+1. Compra el dominio (Cloudflare Registrar u otro) y añade el sitio a Cloudflare.
+2. Worker → Settings → Domains & Routes → Add → **Custom domain** → `tudominio.com`.
 3. Actualiza `APP_URL`, `VITE_SITE_URL`, la Site URL de Supabase y el webhook de Stripe a `https://TUDOMINIO.com/api/billing/webhook`.
-4. Redeploy.
+4. Vuelve a desplegar (Deployments → Retry, o un commit nuevo).
 
 ## 9. Pasar Stripe a real
 1. Activa tu cuenta Stripe (datos fiscales y bancarios).
@@ -122,11 +127,15 @@ Reglas de tienda:
 
 ---
 
-## Presupuesto de tokens (v1.1)
-Cada plan tiene un presupuesto mensual de tokens de IA (`tokensPerMonth` en `shared/plans.ts`: Gratis 100 k, Plus 2 M, Pro 6 M; el modo Profundo cuenta x3). Se mide con el consumo real que informa OpenAI y se ve en Mi cuenta. **Ajusta esas cifras con los precios reales de tu panel** para que cada plan deje margen (cobro − comisión de Stripe − coste de IA, búsquedas, imágenes y audio). Requiere volver a ejecutar `schema.sql` (añade la función `add_tokens`).
+## Modelos de IA y presupuesto de tokens (v1.2)
+Por defecto **todas** las respuestas usan el modelo más potente de OpenAI (`gpt-6.2-astra`, verificado en la documentación de OpenAI el 20-nov-2026: 8 $ entrada / 40 $ salida por millón de tokens). Respaldo automático: `gpt-6.2-sol`. Imágenes: `gpt-image-2.6-sunburst` (respaldo `gpt-image-2.5-sunburst`). Voz: `gpt-transcribe`. Títulos y sugerencias usan `gpt-6-luna` (`OPENAI_MODEL_LIGHT`) porque son tareas mínimas. Todo se cambia con variables, sin tocar código.
+
+Como Astra es caro, cada plan tiene un **presupuesto mensual de tokens** (`tokensPerMonth` en `shared/plans.ts`): Gratis 40 k, Plus 250 k, Pro 700 k (≈ 15, 100 y 280 mensajes de uso normal; estimación mía de unos 2.500 tokens por mensaje). Se mide con el consumo real que informa OpenAI, ponderado por el precio del modelo usado: si pones `OPENAI_MODEL_PAID=gpt-6.2-sol` en Cloudflare, los mismos tokens rinden 4 veces más. Se ve en Mi cuenta. Requiere volver a ejecutar `schema.sql` (función `add_tokens`).
+
+Cuentas rápidas (comprueba precios en tu panel): un mensaje normal en Astra cuesta ≈ 0,05 $; el presupuesto Plus ≈ 5 $ y el Pro ≈ 14 $ en el peor caso, antes de búsquedas web (10 $/1000), imágenes y audio. Si quieres más mensajes por el mismo precio, usa `gpt-6.2-sol` en Gratis/Plus y deja Astra para Pro y modo Profundo.
 
 ## Costes aproximados (verifícalos)
-Datos de terceros, no confirmados por mí: gpt-6-luna ≈ 0,10/0,50 $ por 1M tokens (entrada/salida), gpt-6.1-terra ≈ 1/5 $, gpt-6.1-sol ≈ 2/10 $, transcripción ≈ 0,0045 $/min, búsqueda web ≈ 10 $/1000 llamadas, imagen ≈ 0,03–0,05 $ (estimado). Con los límites de `shared/plans.ts` el peor caso por usuario está acotado, pero **calcula tu margen con los precios reales de tu panel** y ajusta límites en ese fichero.
+Precios de OpenAI leídos el 20-nov-2026: gpt-6.2-astra 8/40 $, gpt-6.2-sol 2/10 $, gpt-6.1-terra 1/5 $, gpt-6-luna 0,10/0,50 $ por millón de tokens (entrada/salida). Transcripción y precio por imagen: no publicados en esa página; mira tu panel. Calcula tu margen (cobro − IVA − comisión de Stripe − coste de IA) y ajusta límites en `shared/plans.ts`.
 
 ## Si algo falla
 - `/api/health` con algún `false` → falta esa variable en Cloudflare.

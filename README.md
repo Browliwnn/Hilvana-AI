@@ -1,6 +1,6 @@
 # Hilvana AI
 
-Asistente de respuestas con IA: texto, lectura de fotos, transcripción de audio, creación de imágenes, búsqueda web con fuentes y modo Profundo. React + Vite (web) · Cloudflare Pages Functions con Hono (API) · Supabase (login y datos) · Stripe (planes) · Capacitor (iOS/Android).
+Asistente de respuestas con IA: texto, lectura de fotos, transcripción de audio, creación de imágenes, búsqueda web con fuentes y modo Profundo. React + Vite (web) · Cloudflare Workers con Hono (API) y assets estáticos (web) · Supabase (login y datos) · Stripe (planes) · Capacitor (iOS/Android).
 
 Límites y precios: `shared/plans.ts` (un solo sitio). Datos legales y email: `src/config.ts`.
 
@@ -11,7 +11,7 @@ Límites y precios: `shared/plans.ts` (un solo sitio). Datos legales y email: `s
 npm install
 cp .dev.vars.example .dev.vars     # rellena claves
 cp .env.example .env               # URL y anon key de Supabase
-npm run dev                        # http://localhost:8788
+npm run dev                        # http://localhost:5173
 ```
 
 ## 2. Supabase
@@ -25,12 +25,11 @@ git init && git add . && git commit -m "Hilvana"
 gh repo create hilvana --private --source=. --push
 ```
 
-## 4. Cloudflare Pages
-Workers & Pages → Create → Pages → conecta el repo.
-- Build command: `npm run build` · Output: `dist`
-- Variables de build: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_OAUTH_PROVIDERS`, `VITE_SITE_URL` (para sitemap y Open Graph)
-- Secrets (Settings → Variables and secrets): `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` (4)
-- Variables: `APP_URL=https://tudominio.com`, `OPENAI_MODEL_FREE/PAID/DEEP/FALLBACK`, `OPENAI_IMAGE_MODEL(_FALLBACK)`, `OPENAI_TRANSCRIBE_MODEL(_FALLBACK)` (comprueba en OpenAI qué modelos tienes disponibles y sus precios)
+## 4. Cloudflare (Worker + web estática)
+Workers & Pages → Create → Import a repository. Build `npm run build`, deploy `npx wrangler deploy`. El nombre del proyecto debe coincidir con `name` en `wrangler.toml`.
+- **Variables de build** (imprescindibles): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_SITE_URL`, `VITE_OAUTH_PROVIDERS`
+- **Secretos del Worker**: `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` (4)
+- **Variables del Worker**: `APP_URL=https://tudominio.com` y, opcional, `OPENAI_MODEL_FREE/PAID/DEEP/FALLBACK/LIGHT`, `OPENAI_IMAGE_MODEL(_FALLBACK)`, `OPENAI_TRANSCRIBE_MODEL(_FALLBACK)`
 
 ## 5. Stripe
 1. Productos → crea **Plus** (9,99 €/mes · 99 €/año) y **Pro** (24,99 €/mes · 249 €/año) → copia los 4 `price_...` a `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_PLUS_YEARLY`, `STRIPE_PRICE_PRO_YEARLY`.
@@ -39,7 +38,7 @@ Workers & Pages → Create → Pages → conecta el repo.
 4. Prueba con tarjeta `4242 4242 4242 4242` en modo test; después cambia a claves live.
 
 ## 6. Dominio
-Cloudflare Pages → Custom domains → añade el dominio (si compras en Cloudflare Registrar, es automático). Actualiza `APP_URL` y las URLs de Supabase/Stripe.
+Worker → Settings → Domains & Routes → Custom domain (si compras en Cloudflare Registrar, es casi automático). Actualiza `APP_URL` y las URLs de Supabase/Stripe.
 
 ## 7. App Store y Play Store (Capacitor)
 ```bash

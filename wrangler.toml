@@ -1,4 +1,4 @@
-name = "hilvana-ai" # debe coincidir con el nombre del proyecto en Cloudflare
+name = "hilvana-ai" # debe coincidir con el nombre del Worker en Cloudflare
 main = "worker/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]

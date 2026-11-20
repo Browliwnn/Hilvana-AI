@@ -1,5 +1,6 @@
 name = "hilvana-ai" # debe coincidir con el nombre del Worker en Cloudflare
 main = "workers/index.ts"
+workers_dev = true
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
 keep_vars = true # el despliegue NO borra las variables que pongas en el panel de Cloudflare
